@@ -14,6 +14,7 @@ DELETE_TAGS=${INPUT_DELETE_TAGS:-false}
 MINIMUM_TAGS=${INPUT_MINIMUM_TAGS:-0}
 DEFAULT_BRANCHES=${INPUT_DEFAULT_BRANCHES:-main,master}
 EXCLUDE_OPEN_PR_BRANCHES=${INPUT_EXCLUDE_OPEN_PR_BRANCHES:-true}
+BATCH_SIZE=${INPUT_BATCH_SIZE:-100}
 
 echo "was_dry_run=${DRY_RUN}" >> $GITHUB_OUTPUT
 deleted_branches=()
@@ -105,6 +106,7 @@ main() {
     local sha
     git config --global --add safe.directory "${GITHUB_WORKSPACE}"
     git fetch --prune --unshallow --tags
+    local branch_counter=0
     for br in $(git ls-remote -q --heads --refs | sed "s@^.*heads/@@"); do
         if [[ -z "$(git log --oneline -1 --since="${DATE}" origin/"${br}")" ]]; then
             sha=$(git show-ref -s "origin/${br}")
@@ -113,9 +115,16 @@ main() {
             extra_branch_or_tag_protected "${br}" "branch" && echo "branch: ${br} is explicitly protected and won't be deleted" && continue
             is_pr_open_on_branch "${br}" && echo "branch: ${br} has an open pull request and won't be deleted" && continue
             delete_branch_or_tag "${br}" "heads" "${sha}"
+
+            if ((++branch_counter >= $BATCH_SIZE)); then
+                echo "Processed $BATCH_SIZE branches, stopping"
+                break
+            fi
         fi
     done
+    echo "Processed $branch_counter branch(es)"
     echo "deleted_branches=${deleted_branches[@]}" >> $GITHUB_OUTPUT
+
     if [[ "${DELETE_TAGS}" == true ]]; then
         local tag_counter=1
         for br in $(git ls-remote -q --tags --refs | sed "s@^.*tags/@@" | sort -rn); do

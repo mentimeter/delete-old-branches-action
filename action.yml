@@ -36,6 +36,10 @@ inputs:
     description: "Exclude branches that have an open pull request"
     required: false
     default: true
+  batch_size:
+    description: "Maximum number of branches to process"
+    required: false
+    default: 100
 outputs:
   was_dry_run:
     description: "Ran in dry-run mode so no branches were deleted"
